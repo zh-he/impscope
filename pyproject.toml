@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "impscope"
+description = "Python Dependency Impact Analyzer"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.7"
+license = { file = "LICENSE" }
+authors = [{ name = "zh-he", email = "zh.he@siat.ac.cn" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11"
+]
+keywords = ["python", "dependencies", "analysis", "impact"]
+
+[project.urls]
+Homepage = "https://github.com/zh-he/impscope"
+Repository = "https://github.com/zh-he/impscope"
+Issues = "https://github.com/zh-he/impscope/issues"
+
+[project.scripts]
+impscope = "impscope.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["impscope*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "impscope.__version__" }
