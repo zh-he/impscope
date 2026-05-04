@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .core import DependencyAnalyzer, get_changed_python_files
+from .core import DependencyAnalyzer, get_changed_python_files, get_working_tree_python_files
 from .formatter import ImpactFormatter
 
 
@@ -21,6 +21,7 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  impscope                                  # Show impact of current Python changes
   impscope impact models.py                   # Analyze impact of changing models.py
   impscope unimported                         # List files not imported by others
   impscope graph                              # Show dependency graph (top most depended files)
@@ -204,8 +205,11 @@ def main() -> None:
 
         if args.command == "graph":
             ascending = args.sort == "asc"
-            # For text mode, let --full/--limit influence how many we fetch.
-            graph_limit = len(analyzer.dependents) if args.full else max(args.limit, 10)
+            # JSON is always full; for text mode, let --full/--limit influence item count.
+            if args.format == "json" or args.full:
+                graph_limit = len(analyzer.dependents)
+            else:
+                graph_limit = max(args.limit, 10)
             top_files = analyzer.get_most_depended_files(
                 limit=graph_limit,
                 ascending=ascending
@@ -230,6 +234,19 @@ def main() -> None:
                 if "error" not in result:
                     impacts[rel] = result
             formatter.print_since_report(args.commit, changed, impacts)
+            return
+
+        changed = get_working_tree_python_files(
+            repo_root=root,
+            exclude_globs=args.exclude
+        )
+        if changed:
+            impacts: dict[str, dict] = {}
+            for rel in changed:
+                result = analyzer.get_impact_analysis(rel)
+                if "error" not in result:
+                    impacts[rel] = result
+            formatter.print_working_tree_report(changed, impacts)
             return
 
         formatter.print_brief_stats(analyzer)

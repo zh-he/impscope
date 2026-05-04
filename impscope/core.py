@@ -12,6 +12,59 @@ from pathlib import Path
 from typing import Dict, List, Set, Tuple, Optional
 
 
+def _is_under(path: Path, base: Path) -> bool:
+    try:
+        return path.is_relative_to(base)
+    except AttributeError:
+        try:
+            path.relative_to(base)
+            return True
+        except Exception:
+            return False
+
+
+def _get_git_root(repo_root: Path) -> Optional[Path]:
+    try:
+        git_root_raw = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        if not git_root_raw:
+            return None
+        return Path(git_root_raw).resolve()
+    except subprocess.CalledProcessError:
+        return None
+
+
+def _relativize_git_paths(
+        git_root: Path,
+        repo_root: Path,
+        paths: List[str],
+        exclude_globs: Optional[List[str]] = None,
+) -> List[str]:
+    exclude_globs = exclude_globs or []
+    files: List[str] = []
+
+    for path in paths:
+        rel_to_git = path.strip()
+        if not rel_to_git.endswith(".py"):
+            continue
+
+        abs_path = (git_root / rel_to_git).resolve()
+        if not _is_under(abs_path, repo_root):
+            continue
+
+        rel = str(abs_path.relative_to(repo_root)).replace("\\", "/")
+        if any(fnmatch.fnmatch(rel, pat) for pat in exclude_globs):
+            continue
+
+        files.append(rel)
+
+    return sorted(set(files))
+
+
 class ImportVisitor(ast.NodeVisitor):
     """AST visitor to extract import statements from Python files"""
 
@@ -230,7 +283,8 @@ class DependencyAnalyzer:
     def _analyze_file(self, file_path: Path) -> None:
         """Analyze a single Python file and index its module name"""
         try:
-            content = file_path.read_text(encoding="utf-8", errors="replace")
+            # "utf-8-sig" keeps UTF-8 behavior and transparently strips BOM if present.
+            content = file_path.read_text(encoding="utf-8-sig", errors="replace")
             tree = ast.parse(content)
             visitor = ImportVisitor(str(file_path))
             visitor.visit(tree)
@@ -512,7 +566,7 @@ class DependencyAnalyzer:
             if not self.dependents.get(rel_path):
                 # Heuristic: keep scripts with __main__ guard out of "unimported" list
                 try:
-                    text = info["path"].read_text(encoding="utf-8", errors="replace")
+                    text = info["path"].read_text(encoding="utf-8-sig", errors="replace")
                     if main_guard_re.search(text):
                         continue
                 except Exception:
@@ -553,36 +607,65 @@ def get_changed_python_files(
       - repo_root must be inside a Git repo
     """
     exclude_globs = exclude_globs or []
+    repo_root = repo_root.resolve()
 
     if shutil.which("git") is None:
         # Git not available
         return []
 
-    # Run: git -C <repo_root> diff --name-only --diff-filter=ACMR <since>..HEAD -- '*.py'
+    # Resolve the containing git root first. `repo_root` can be either:
+    # - the repository root, or
+    # - a subdirectory inside the repository.
+    git_root = _get_git_root(repo_root)
+    if git_root is None:
+        return []
+
+    # Run diff from the actual git root, then project paths back to repo_root.
     cmd = [
-        "git", "-C", str(repo_root),
+        "git", "-C", str(git_root),
         "diff", "--name-only", "--diff-filter=ACMR",
         f"{since_commit}..HEAD", "--", "*.py"
     ]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        files = []
-        for line in res.stdout.splitlines():
-            path = line.strip()
-            if not path.endswith(".py"):
-                continue
-            # Normalize to POSIX-style
-            rel = path.replace("\\", "/")
-
-            # Ensure path is within repo (best-effort)
-            # (git diff gives paths relative to repo root by default)
-            if any(fnmatch.fnmatch(rel, pat) for pat in exclude_globs):
-                continue
-
-            files.append(rel)
-
-        # Unique + sorted for stable output
-        return sorted(set(files))
+        return _relativize_git_paths(git_root, repo_root, res.stdout.splitlines(), exclude_globs)
     except subprocess.CalledProcessError:
         # Not a git repo, bad commit, or other error
         return []
+
+
+def get_working_tree_python_files(
+        repo_root: Path,
+        exclude_globs: Optional[List[str]] = None,
+) -> List[str]:
+    """
+    Return changed Python files in the current working tree, relative to repo_root.
+
+    Includes staged, unstaged, and untracked files. Deleted files are ignored
+    because there is no local file left to analyze.
+    """
+    exclude_globs = exclude_globs or []
+    repo_root = repo_root.resolve()
+
+    if shutil.which("git") is None:
+        return []
+
+    git_root = _get_git_root(repo_root)
+    if git_root is None:
+        return []
+
+    commands = [
+        ["git", "-C", str(git_root), "diff", "--name-only", "--diff-filter=ACMR", "--", "*.py"],
+        ["git", "-C", str(git_root), "diff", "--cached", "--name-only", "--diff-filter=ACMR", "--", "*.py"],
+        ["git", "-C", str(git_root), "ls-files", "--others", "--exclude-standard", "--", "*.py"],
+    ]
+
+    changed: List[str] = []
+    for cmd in commands:
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        except subprocess.CalledProcessError:
+            return []
+        changed.extend(res.stdout.splitlines())
+
+    return _relativize_git_paths(git_root, repo_root, changed, exclude_globs)

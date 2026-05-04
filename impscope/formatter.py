@@ -2,7 +2,7 @@
 Output formatting for impscope
 """
 import json
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .core import DependencyAnalyzer
 
@@ -169,11 +169,23 @@ class ImpactFormatter:
                 print(f"     └── ... and {len(unimported_all) - len(unimported)} more")
 
     # -------- Since report --------
-    def print_since_report(self, since: str, changed: List[str], impacts: Dict[str, Dict]) -> None:
+    def print_since_report(
+            self,
+            since: str,
+            changed: List[str],
+            impacts: Dict[str, Dict],
+            title: Optional[str] = None,
+            unresolved_message: Optional[str] = None,
+    ) -> None:
         """
         Pretty output for --since COMMIT report.
         impacts: mapping from changed file -> impact dict (same schema as print_impact_analysis input)
         """
+        title = title or f"Impact Since {since}"
+        unresolved_message = unresolved_message or (
+            "No impacts could be resolved (not a git repo, bad commit, or files outside path)."
+        )
+
         # Build union
         union_direct, union_indirect = set(), set()
         for result in impacts.values():
@@ -196,7 +208,7 @@ class ImpactFormatter:
             print(json.dumps(payload, indent=2))
             return
 
-        print(f"Impact Since {since}")
+        print(title)
         print("-" * 60)
 
         # Changed files
@@ -218,7 +230,7 @@ class ImpactFormatter:
         print(f"  Total Impact:        {union_total} files")
 
         if not impacts:
-            print("\nNo impacts could be resolved (not a git repo, bad commit, or files outside path).")
+            print(f"\n{unresolved_message}")
             return
 
         print("\nPer-file impact (changed → affected):")
@@ -229,6 +241,15 @@ class ImpactFormatter:
             print(f"  • {file}: {total} files")
         if not self.full and len(items) > len(to_show):
             print(f"  ... and {len(items) - len(to_show)} more")
+
+    def print_working_tree_report(self, changed: List[str], impacts: Dict[str, Dict]) -> None:
+        self.print_since_report(
+            "working tree",
+            changed,
+            impacts,
+            title="Current Change Impact",
+            unresolved_message="No impacts could be resolved (files may be outside the analyzed path).",
+        )
 
     # -------- Default Brief --------
     def print_brief_stats(self, analyzer: DependencyAnalyzer) -> None:
@@ -259,7 +280,7 @@ class ImpactFormatter:
             "total_dependencies": total_deps,
             "order": "asc" if ascending else "desc",
             "most_depended_files": analyzer.get_most_depended_files(
-                limit=(len(analyzer.dependents) if self.full else 10),
+                limit=len(analyzer.dependents),
                 ascending=ascending,
             ),
             "unimported_files": analyzer.get_unimported_files(),

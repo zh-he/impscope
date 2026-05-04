@@ -2,7 +2,7 @@
 
 一个小而快的工具，用于分析 Python 文件间的依赖关系，并评估改动带来的影响范围。纯标准库实现，无外部依赖。
 
-[[English](README.md)|简体中文]
+[English](README.md) | [简体中文](README.zh-CN.md)
 
 ## 特性
 
@@ -11,7 +11,7 @@
 - 依赖图（最多/最少被依赖文件，可指定排序）
 - 代码库统计（总量与均值）
 - 支持按通配符排除文件/目录（`--exclude "tests/*"` 等）
-- 基于 Git 的改动影响（`--since <commit>`）：统计本次改动的“联合波及面”
+- 基于 Git 的改动影响（`since <commit>`）：统计本次改动的“联合波及面”
 - 支持文本与 JSON 输出
 - 纯 Python，AST 解析，速度快
 - 支持 Python 3.7+
@@ -33,29 +33,29 @@ pip install -e .
 ## 快速开始
 
 ```bash
-# 分析当前目录（简要统计）
+# 查看当前 Python 改动可能影响哪些文件
 impscope
 
 # 查看修改某个文件的影响范围
-impscope --impact models.py
+impscope impact models.py
+
+# 分析当前目录（简要统计）
+impscope stats
 
 # 列出没有被其它文件导入的文件
-impscope --unimported
-
-# 展示依赖统计（默认按被依赖数降序）
-impscope --stats
+impscope unimported
 
 # 展示“最少被依赖”的文件
-impscope --graph --sort asc
+impscope graph --sort asc
 
 # 指定路径并排除测试/迁移等目录
-impscope --path src/ --stats --exclude "tests/*" --exclude "*/migrations/*"
+impscope --path src/ --exclude "tests/*" --exclude "*/migrations/*" stats
 
 # 基于 Git 的增量影响（上一次提交以来改动的 .py 文件）
-impscope --since HEAD
+impscope since HEAD
 
 # 输出 JSON（便于 CI 使用）
-impscope --since main --format json
+impscope --format json since main
 ```
 
 提示：也可以以模块形式运行：
@@ -68,24 +68,29 @@ python -m impscope --help
 ## 命令行选项
 
 ```text
-impscope [OPTIONS]
+impscope [全局选项] <command> [子命令选项]
 
-Options:
-  --impact FILE          Analyze the impact of changing a specific file
-  --unimported           List files that are not imported by any other file
-                         (aliases: --not-imported, --unused)
-  --graph                Show dependency graph (top most/least depended files)
-  --stats                Show comprehensive dependency statistics
-  --since COMMIT         Analyze the union impact of Python files changed
-                         since COMMIT (e.g., HEAD~1, <hash>, <branch>)
-  --path PATH            Root path to analyze (default: current directory)
-  --exclude GLOB         Glob pattern to exclude (repeatable)
-                         e.g., --exclude "tests/*" --exclude "*/migrations/*"
-  --format FORMAT        Output format: text or json (default: text)
-  --sort {asc,desc}      Sort order for ranked lists in --stats/--graph
-                         (default: desc)
-  --version              Show version information
-  --help                 Show help message
+子命令：
+  impact FILE           分析某个文件改动带来的影响范围
+  unimported            列出没有被其它文件导入的文件
+  graph                 显示依赖图（最多/最少被依赖文件）
+  stats                 显示完整依赖统计
+  since COMMIT          分析自 COMMIT 以来变更 Python 文件的联合影响
+                        （例如：HEAD~1、<hash>、<branch>）
+
+全局选项（必须写在子命令前）：
+  --path PATH                 分析根路径（默认：当前目录）
+  --exclude GLOB              排除 glob（可重复）
+                              例如：--exclude "tests/*" --exclude "*/migrations/*"
+  --format {text,json}        输出格式（默认：text）
+  --full                      文本输出不截断长列表
+  --limit N                   文本输出（非 --full）每个列表最多显示 N 项（默认：10）
+  --source-root DIR           将 DIR（相对 --path）视作导入根（可重复）
+  --include-outside-roots     提供 --source-root 时，同时纳入这些根之外的文件
+  --strict-resolution         只解析能精确命中的模块（不做父包回退）
+                              (no parent-package fallback)
+  --version                   显示版本信息
+  --help                      显示帮助
 ```
 
 ## 工作原理
@@ -112,7 +117,7 @@ Options:
 - 模式匹配的是**相对路径（POSIX 风格）**，如 `src/app/models.py`。
 - 可多次传入：
   ```bash
-  impscope --stats --exclude "tests/*" --exclude "*/migrations/*"
+  impscope --exclude "tests/*" --exclude "*/migrations/*" stats
   ```
 
 - Source roots
@@ -120,7 +125,7 @@ Options:
   - 使用 `--source-root` 将一个或多个目录视为“导入根”（相对于 `--path`）：
 
   ```
-  impscope stats --path . --source-root src --source-root python
+  impscope --path . --source-root src --source-root python stats
   ```
 
   - 若加上 `--include-outside-roots`，会**同时**扫描根之外的 Python 文件（这些文件的模块名按项目根计算）。

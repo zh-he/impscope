@@ -2,7 +2,7 @@
 
 A small, fast tool to analyze Python file dependencies and assess the impact of changes. Pure standard library, no external deps.
 
-[English | [简体中文](README.zh-CN.md)]
+[English](README.md) | [简体中文](README.zh-CN.md)
 
 ## Features
 
@@ -35,11 +35,14 @@ pip install -e .
 ## Quick Start
 
 ```bash
-# Show dependency statistics (brief overview)
-impscope stats
+# See what your current Python edits may affect
+impscope
 
 # Check the impact of changing a specific file
 impscope impact models.py
+
+# Show dependency statistics (brief overview)
+impscope stats
 
 # List files that are not imported by any other file
 impscope unimported
@@ -51,13 +54,13 @@ impscope graph
 impscope graph --sort asc
 
 # Analyze a specific directory and exclude tests/migrations
-impscope stats --path src/ --exclude "tests/*" --exclude "*/migrations/*"
+impscope --path src/ --exclude "tests/*" --exclude "*/migrations/*" stats
 
 # Impact of files changed since last commit (Git required)
 impscope since HEAD
 
 # JSON output (great for CI)
-impscope since main --format json
+impscope --format json since main
 ```
 
 Tip: you can also run it as a module:
@@ -69,7 +72,7 @@ python -m impscope --help
 ## Usage
 
 ```text
-impscope <command> [OPTIONS]
+impscope [GLOBAL_OPTIONS] <command> [COMMAND_OPTIONS]
 
 Commands:
   impact FILE           Analyze the impact of changing a specific file
@@ -79,7 +82,7 @@ Commands:
   since COMMIT          Analyze union impact of Python files changed since COMMIT
                         (e.g., HEAD~1, <hash>, <branch>)
 
-Global options:
+Global options (must appear before the subcommand):
   --path PATH                 Root path to analyze (default: current directory)
   --exclude GLOB              Glob pattern to exclude (repeatable)
                               e.g., --exclude "tests/*" --exclude "*/migrations/*"
@@ -119,14 +122,14 @@ It handles:
 - `--exclude` patterns are matched against relative paths (POSIX style), e.g. `src/app/models.py`.
 - You can repeat `--exclude` multiple times:
   ```bash
-  impscope stats --exclude "tests/*" --exclude "*/migrations/*"
+  impscope --exclude "tests/*" --exclude "*/migrations/*" stats
   ```
 
 ### Source roots
 
 - Use `--source-root` to treat one or more directories as import roots (relative to `--path`):
   ```bash
-  impscope stats --path . --source-root src --source-root python
+  impscope --path . --source-root src --source-root python stats
   ```
 - With `--include-outside-roots`, files outside these roots are also scanned (module names computed relative to the project root).
 
