@@ -11,7 +11,7 @@ requires-python = ">=3.7"
 license = { file = "LICENSE" }
 authors = [{ name = "zh-he", email = "zh.he@siat.ac.cn" }]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
