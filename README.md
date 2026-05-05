@@ -163,6 +163,12 @@ It handles:
 - Python 3.7+
 - No external dependencies (standard library only)
 
+## Testing
+
+```bash
+python -m unittest discover -v
+```
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or pull request.

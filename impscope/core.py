@@ -160,6 +160,14 @@ class DependencyAnalyzer:
                     print(f"Warning: source_root does not exist: {sr_path}", file=sys.stderr)
         self.include_outside_roots: bool = include_outside_roots
 
+    def reset(self) -> None:
+        """Clear indexed files and dependency graph state."""
+        self.files.clear()
+        self.dependencies.clear()
+        self.dependents.clear()
+        self.module_map.clear()
+        self.path_to_module.clear()
+
     # ----------------------------
     # Scanning & indexing
     # ----------------------------
@@ -169,6 +177,8 @@ class DependencyAnalyzer:
             exclude_globs: Optional[List[str]] = None
     ) -> None:
         """Scan directory for Python files and analyze them"""
+        self.reset()
+
         if ignore_dirs is None:
             ignore_dirs = [
                 ".git", ".hg", ".svn",  # Version control
@@ -521,9 +531,22 @@ class DependencyAnalyzer:
     # ----------------------------
     # Public APIs
     # ----------------------------
+    def _normalize_query_path(self, file_path: str) -> Optional[str]:
+        """Normalize a user-supplied path to the analyzer's relative POSIX keys."""
+        path = Path(file_path)
+        if path.is_absolute():
+            try:
+                return str(path.resolve().relative_to(self.root_path)).replace("\\", "/")
+            except ValueError:
+                return None
+
+        return file_path.replace("\\", "/")
+
     def get_impact_analysis(self, file_path: str) -> Dict:
         """Get impact analysis for a specific file (direct + indirect dependents)"""
-        normalized = file_path.replace("\\", "/")
+        normalized = self._normalize_query_path(file_path)
+        if normalized is None:
+            return {"error": f"File is outside analyzed root: {file_path}"}
 
         # Accept partial matches like "models.py", but handle ambiguity deterministically
         if normalized not in self.files:

@@ -159,6 +159,12 @@ impscope [全局选项] <command> [子命令选项]
 
 - 无外部依赖（仅标准库）
 
+## 测试
+
+```bash
+python -m unittest discover -v
+```
+
 ## 贡献
 
 欢迎提 Issue 或 PR，一起把工具打磨得更好。

@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 import unittest
+import uuid
 from pathlib import Path
 
 
@@ -14,8 +15,7 @@ TEST_TMP_ROOT.mkdir(exist_ok=True)
 
 def make_test_root(test_id: str) -> Path:
     safe_name = "".join(ch if ch.isalnum() else "_" for ch in test_id)
-    root = TEST_TMP_ROOT / safe_name
-    shutil.rmtree(root, ignore_errors=True)
+    root = TEST_TMP_ROOT / f"{safe_name}_{uuid.uuid4().hex}"
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -40,6 +40,7 @@ def run_impscope(args, cwd: Path) -> subprocess.CompletedProcess:
         cwd=str(cwd),
         env=env,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=True,
     )
